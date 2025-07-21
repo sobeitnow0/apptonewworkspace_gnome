@@ -1,8 +1,8 @@
 {
-  "uuid": "apptonewworkspace@sobeit",
+  "uuid": "apptonewworkspace@sobeit.com",
   "name": "App em Novo Workspace",
   "description": "Inicia aplicativos selecionados em um novo workspace.",
   "shell-version": ["46", "47", "48"],
-  "url": "https://github.com/your-username/app-to-new-workspace",
+  "url": "https://github.com/sobeitnow0/apptonewworkspace_gnome",
   "settings-schema": "org.gnome.shell.extensions.apptonewworkspace"
 }

@@ -1,130 +1,83 @@
-// prefs.js
-// See: https://gjs.guide/extensions/development/preferences.html
-
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
 import Gio from 'gi://Gio';
 
-import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
-
-// Função principal que será chamada pelo GNOME Shell para criar a interface de preferências
-export default class AppToNewWorkspacePreferences {
-    constructor(extension) {
-        this.extension = extension;
-        this.settings = extension.getSettings();
+const AppToNewWorkspacePrefs = class {
+    constructor() {
+        // Inicialização opcional
     }
 
     fillPreferencesWindow(window) {
-        // Cria uma página principal para as configurações
-        const page = new Adw.PreferencesPage({
-            title: _('General'),
-            icon_name: 'dialog-information-symbolic',
+        const settings = new Gio.Settings({
+            schema_id: 'org.gnome.shell.extensions.apptonewworkspace',
         });
-        window.add(page);
 
-        // Grupo para a lista de aplicativos
+        const page = new Adw.PreferencesPage();
         const group = new Adw.PreferencesGroup({
-            title: _('Applications for New Workspaces'),
-            description: _('Enter the application IDs (e.g., "firefox.desktop", "org.gnome.Terminal.desktop") that should always open in a new workspace. Press Enter after each ID.'),
+            title: 'Aplicativos em Novo Workspace',
+            description: 'Adicione arquivos .desktop dos apps que devem iniciar sempre em um novo espaço de trabalho.',
         });
-        page.add(group);
 
-        // Widget para exibir a lista de aplicativos
-        const appsListRow = new Adw.ExpanderRow({
-            title: _('Configured Applications'),
-        });
-        group.add(appsListRow);
-
-        const appsListBox = new Gtk.ListBox({
+        const listBox = new Gtk.ListBox({
             selection_mode: Gtk.SelectionMode.NONE,
-            valign: Gtk.Align.START,
-            halign: Gtk.Align.FILL,
-            margin_top: 10,
-            margin_bottom: 10,
-            margin_start: 10,
-            margin_end: 10,
-            css_classes: ['boxed-list'], // Estilo visual do GNOME
+            margin_top: 12,
+            margin_bottom: 12,
         });
-        appsListRow.add_row(appsListBox);
 
-        // Adiciona um campo de entrada para novos IDs de aplicativos
-        const newAppIdEntryRow = new Adw.ActionRow({
-            title: _('Add New Application ID'),
-            subtitle: _('Type an App ID and press Enter or click "Add"'),
-        });
-        group.add(newAppIdEntryRow);
+        function updateList() {
+            listBox.remove_all();
 
-        const newAppIdEntry = new Gtk.Entry({
-            hexpand: true,
-            activates_default: true, // Ativa o botão padrão (Adicionar) ao pressionar Enter
-        });
-        newAppIdEntryRow.add_suffix(newAppIdEntry); // Adiciona o campo de entrada no final da linha
+            const apps = settings.get_strv('apps-to-new-workspace');
+            for (const appId of apps) {
+                const row = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
 
-        const addAppButton = new Gtk.Button({
-            label: _('Add'),
-            css_classes: ['suggested-action'], // Estilo para botão de ação
-        });
-        newAppIdEntryRow.add_suffix(addAppButton);
-
-        // --- Funções Auxiliares ---
-
-        // Função para recarregar a lista de aplicativos na interface
-        const loadAppsList = () => {
-            // Limpa a lista existente
-            let child = appsListBox.get_first_child();
-            while (child) {
-                appsListBox.remove(child);
-                child = appsListBox.get_first_child();
-            }
-
-            // Pega a lista atual de IDs do GSettings
-            const currentApps = this.settings.get_strv('apps-to-new-workspace');
-
-            // Adiciona cada ID à lista na interface
-            currentApps.forEach(appId => {
-                const row = new Adw.ActionRow({
-                    title: appId,
+                const label = new Gtk.Label({
+                    label: appId,
+                    xalign: 0,
+                    hexpand: true,
                 });
-                const removeButton = new Gtk.Button({
-                    icon_name: 'user-trash-symbolic',
-                    tooltip_text: _('Remove'),
-                    css_classes: ['destructive-action'], // Estilo para botão de exclusão
-                });
+
+                const removeButton = new Gtk.Button({ label: 'Remover' });
                 removeButton.connect('clicked', () => {
-                    // Remove o ID do aplicativo da lista e salva
-                    const updatedApps = currentApps.filter(id => id !== appId);
-                    this.settings.set_strv('apps-to-new-workspace', updatedApps);
-                    loadAppsList(); // Recarrega a interface para refletir a mudança
+                    const updated = apps.filter(id => id !== appId);
+                    settings.set_strv('apps-to-new-workspace', updated);
+                    updateList();
                 });
-                row.add_suffix(removeButton);
-                appsListBox.append(row);
-            });
-        };
 
-        // Função para adicionar um novo aplicativo
-        const addApp = () => {
-            const appId = newAppIdEntry.get_text().trim(); // Pega o texto e remove espaços em branco
-            if (appId) {
-                const currentApps = this.settings.get_strv('apps-to-new-workspace');
-                if (!currentApps.includes(appId)) { // Evita duplicatas
-                    currentApps.push(appId);
-                    this.settings.set_strv('apps-to-new-workspace', currentApps);
-                    newAppIdEntry.set_text(''); // Limpa o campo de entrada
-                    loadAppsList(); // Recarrega a interface
-                } else {
-                    // Opcional: mostrar um aviso ao usuário que o ID já existe
-                    log(`[AppToNewWorkspacePrefs]: App ID "${appId}" already exists.`);
+                row.append(label);
+                row.append(removeButton);
+                listBox.append(row);
+            }
+        }
+
+        const entry = new Gtk.Entry({
+            placeholder_text: 'Ex: firefox.desktop',
+            hexpand: true,
+        });
+
+        const addButton = new Gtk.Button({ label: 'Adicionar' });
+        addButton.connect('clicked', () => {
+            const text = entry.get_text().trim();
+            if (text) {
+                const apps = settings.get_strv('apps-to-new-workspace');
+                if (!apps.includes(text)) {
+                    apps.push(text);
+                    settings.set_strv('apps-to-new-workspace', apps);
+                    entry.set_text('');
+                    updateList();
                 }
             }
-        };
+        });
 
-        // Conecta o botão "Adicionar"
-        addAppButton.connect('clicked', addApp);
+        const entryBox = new Gtk.Box({ spacing: 6 });
+        entryBox.append(entry);
+        entryBox.append(addButton);
 
-        // Conecta o evento 'activate' do campo de entrada (pressionar Enter)
-        newAppIdEntry.connect('activate', addApp);
+        group.add(entryBox);
+        group.add(listBox);
+        page.add(group);
 
-        // Carrega a lista inicial de aplicativos ao abrir as preferências
-        loadAppsList();
-    }
-}
+        updateList();
+
+        window.set_title('Configurações – App em Novo Workspace');
+        window.add(page
